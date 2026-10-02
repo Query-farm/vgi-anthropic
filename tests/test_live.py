@@ -20,6 +20,8 @@ from typing import Any
 
 import pytest
 
+from tests.duckdb_session import connect
+
 pytestmark = pytest.mark.live
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -30,8 +32,7 @@ KEY = os.environ.get("ANTHROPIC_ADMIN_API_KEY", "")
 def con() -> Iterator[Any]:
     if not KEY:
         pytest.skip("set ANTHROPIC_ADMIN_API_KEY to run the live tests")
-    haybarn = pytest.importorskip("haybarn")
-    connection = haybarn.connect()
+    connection = connect()
     connection.execute("SET TimeZone = 'UTC'")
     connection.execute(
         f"ATTACH 'anthropic' (TYPE vgi, LOCATION '{sys.executable} {ROOT / 'anthropic_worker.py'}')"

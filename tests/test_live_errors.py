@@ -24,6 +24,8 @@ from typing import Any
 
 import pytest
 
+from tests.duckdb_session import connect
+
 pytestmark = pytest.mark.live
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,8 +34,7 @@ NON_ADMIN_KEY = os.environ.get("ANTHROPIC_NON_ADMIN_KEY", "")
 
 
 def _connect(key: str) -> Any:
-    haybarn = pytest.importorskip("haybarn")
-    con = haybarn.connect()
+    con = connect()
     con.execute(f"ATTACH 'anthropic' (TYPE vgi, LOCATION '{sys.executable} {ROOT / 'anthropic_worker.py'}')")
     quoted = key.replace("'", "''")
     con.execute(f"CREATE SECRET (TYPE anthropic_admin, api_key '{quoted}')")

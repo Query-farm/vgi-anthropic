@@ -20,6 +20,7 @@ from typing import Any
 
 import pytest
 
+from tests.duckdb_session import connect
 from tests.fake_admin_api import ADMIN_KEY, FakeAdminApi
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -60,8 +61,7 @@ def server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
 
 
 def _client(url: str, key: str | None = None) -> Any:
-    haybarn = pytest.importorskip("haybarn")
-    con = haybarn.connect()
+    con = connect()
     con.execute("SET TimeZone = 'UTC'")
     con.execute(f"ATTACH 'anthropic' (TYPE vgi, LOCATION '{url}')")
     if key is not None:
