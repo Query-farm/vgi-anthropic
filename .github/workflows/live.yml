@@ -1,0 +1,35 @@
+name: Live
+
+# The tests that hit the real Admin API. They need an Admin API key, stored as
+# the ANTHROPIC_ADMIN_API_KEY repository secret, and read a real organization's
+# members, keys and spend — so they run on a schedule or by hand, never on a
+# pull request, where a fork could otherwise exfiltrate the secret.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: anthropic-live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Live API tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Each is optional; a test whose key is absent is skipped. An Admin key
+      # exercises real data; the two limited keys exercise the refusals.
+      ANTHROPIC_ADMIN_API_KEY: ${{ secrets.ANTHROPIC_ADMIN_API_KEY }}
+      ANTHROPIC_WORKSPACE_KEY: ${{ secrets.ANTHROPIC_WORKSPACE_KEY }}
+      ANTHROPIC_NON_ADMIN_KEY: ${{ secrets.ANTHROPIC_NON_ADMIN_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --no-sources
+      - name: Live tests
+        run: uv run --no-sources pytest -q -m live

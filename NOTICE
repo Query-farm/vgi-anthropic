@@ -1,0 +1,20 @@
+vgi-anthropic
+Copyright (c) 2026 Query Farm LLC - https://query.farm
+
+This product is licensed under the MIT License. See LICENSE.
+
+------------------------------------------------------------------------------
+
+Anthropic Admin, Usage and Cost APIs
+
+This software reads an organization's own administrative, usage and cost data
+from Anthropic's Admin API, using credentials the organization supplies. That
+data belongs to the organization, and access to the API is subject to
+Anthropic's terms:
+
+    https://www.anthropic.com/legal/commercial-terms
+
+Neither this software nor Query Farm LLC is affiliated with, endorsed by, or
+sponsored by Anthropic PBC. "Anthropic" and "Claude" are trademarks of their
+respective owner and are used here only to describe what this software
+connects to.

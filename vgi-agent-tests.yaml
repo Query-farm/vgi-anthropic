@@ -1,0 +1,128 @@
+# Private graders for the agent-suitability suite (`vgi-lint simulate`).
+#
+# The public half — each task's name and prompt — is the `vgi.agent_test_tasks`
+# catalog tag in vgi_anthropic/worker.py. The solutions live here, outside the
+# catalog, so an analyst under test cannot read them from the metadata it is
+# being graded on. tests/test_catalog.py keeps the two lists in step.
+#
+# Tasks are written to exercise what is easy to get wrong in this catalog:
+# dollars vs cents, the NULL default workspace, that report dimensions follow
+# the query, and that every report needs a start time.
+
+tasks:
+  - name: which_organization
+    reference_sql: SELECT id, name FROM anthropic.main.organization
+    check_sql: SELECT count(*) = 1 FROM anthropic.main.all_organization()
+    success_criteria: Reads the organization table rather than inferring the name from anything else.
+
+  - name: who_are_the_admins
+    reference_sql: SELECT name, email FROM anthropic.main.users WHERE role = 'admin' ORDER BY email
+    check_sql: SELECT count(*) > 0 FROM anthropic.main.all_users() WHERE role = 'admin'
+    success_criteria: Reads users filtered on the organization role.
+    unordered: true
+
+  - name: outstanding_invites
+    reference_sql: >-
+      SELECT email, role, expires_at FROM anthropic.main.invites
+      WHERE status = 'pending' ORDER BY expires_at
+    check_sql: SELECT count(*) >= 0 FROM anthropic.main.all_invites()
+    success_criteria: Reads invites with status 'pending' and reports when each expires.
+    unordered: true
+
+  - name: active_workspaces
+    reference_sql: >-
+      SELECT name, created_at FROM anthropic.main.workspaces
+      WHERE NOT is_archived ORDER BY created_at
+    check_sql: SELECT count(*) >= 0 FROM anthropic.main.all_workspaces()
+    success_criteria: Excludes archived workspaces using is_archived or archived_at.
+    unordered: true
+
+  - name: workspace_admins
+    reference_sql: >-
+      SELECT w.name AS workspace, u.email FROM anthropic.main.workspace_members m
+      JOIN anthropic.main.users u ON u.id = m.user_id
+      JOIN anthropic.main.workspaces w ON w.id = m.workspace_id
+      WHERE m.workspace_role = 'workspace_admin' ORDER BY workspace, u.email
+    check_sql: SELECT count(*) >= 0 FROM anthropic.main.all_workspace_members()
+    success_criteria: >-
+      Joins workspace_members to users and workspaces for names, filtered on the
+      workspace_admin role (not the organization role).
+    unordered: true
+
+  - name: keys_without_expiry
+    reference_sql: >-
+      SELECT name, created_at FROM anthropic.main.api_keys
+      WHERE status = 'active' AND expires_at IS NULL
+    check_sql: SELECT count(*) >= 0 FROM anthropic.main.all_api_keys()
+    success_criteria: Reads api_keys, filters status = 'active' and a NULL expires_at.
+    unordered: true
+
+  - name: model_rate_limit
+    reference_sql: >-
+      SELECT group_display_name, value FROM anthropic.main.rate_limits
+      WHERE limit_type = 'requests_per_minute' AND group_display_name ILIKE '%sonnet%'
+    check_sql: SELECT count(*) > 0 FROM anthropic.main.all_rate_limits()
+    success_criteria: Reads rate_limits for the requests_per_minute limiter of a Sonnet model group.
+    unordered: true
+
+  - name: workspace_rate_overrides
+    reference_sql: >-
+      SELECT workspace_id, group_display_name, limit_type, value, org_limit
+      FROM anthropic.main.workspace_rate_limits WHERE source = 'workspace'
+    check_sql: SELECT count(*) >= 0 FROM anthropic.main.all_workspace_rate_limits()
+    success_criteria: >-
+      Uses workspace_rate_limits and keeps only overrides (source = 'workspace'),
+      comparing value against org_limit.
+    unordered: true
+
+  - name: spend_this_month
+    reference_sql: SELECT sum(amount_usd) FROM anthropic.main.cost_report(date_trunc('month', current_date))
+    success_criteria: Uses cost_report from the first of the month and sums amount_usd, not amount_cents.
+
+  - name: spend_by_workspace
+    reference_sql: >-
+      SELECT COALESCE(w.name, 'Default') AS workspace, sum(c.amount_usd) AS usd
+      FROM anthropic.main.cost_report(current_date - INTERVAL 30 DAY) c
+      LEFT JOIN anthropic.main.workspaces w ON w.id = c.workspace_id GROUP BY ALL
+    success_criteria: >-
+      Joins cost_report to workspaces with a LEFT JOIN so the default workspace
+      (NULL workspace_id) is kept, and labels it.
+    unordered: true
+
+  - name: tokens_by_model
+    reference_sql: >-
+      SELECT model, sum(output_tokens) AS output_tokens
+      FROM anthropic.main.messages_usage(current_date - INTERVAL 7 DAY)
+      GROUP BY model ORDER BY output_tokens DESC
+    success_criteria: Uses messages_usage over the last seven days and groups by model.
+
+  - name: claude_code_adoption
+    reference_sql: >-
+      SELECT email_address, sum(num_sessions) AS sessions
+      FROM anthropic.main.claude_code_usage(current_date - INTERVAL 7 DAY, ending_date => current_date)
+      WHERE actor_type = 'user_actor' GROUP BY email_address ORDER BY sessions DESC
+    success_criteria: Uses claude_code_usage over a date range (ending_date) and sums num_sessions per user.
+
+  - name: key_creators
+    reference_sql:
+      - >-
+        SELECT k.name, u.email FROM anthropic.main.api_keys k
+        JOIN anthropic.main.users u ON u.id = k.created_by_id WHERE k.status = 'active'
+      - >-
+        SELECT k.name, u.email FROM anthropic.main.api_keys k,
+        LATERAL anthropic.main.user_by_id(k.created_by_id) u WHERE k.status = 'active'
+    success_criteria: Resolves api_keys.created_by_id to a user email, by join or by user_by_id.
+    unordered: true
+
+  - name: newest_workspace_residency
+    reference_sql: >-
+      SELECT name, workspace_geo, default_inference_geo, allowed_inference_geos, inference_geo_unrestricted
+      FROM anthropic.main.workspace_by_id((SELECT id FROM anthropic.main.workspaces
+      ORDER BY created_at DESC LIMIT 1))
+    success_criteria: Reports the data-residency columns of the most recently created workspace.
+
+  - name: newest_key_status
+    reference_sql: >-
+      SELECT name, status, workspace_id FROM anthropic.main.api_key_by_id(
+      (SELECT id FROM anthropic.main.api_keys ORDER BY created_at DESC LIMIT 1))
+    success_criteria: Reports the newest API key's status and workspace, by api_key_by_id or the table.

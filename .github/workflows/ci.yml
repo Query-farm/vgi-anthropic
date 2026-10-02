@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # pyproject carries no `[tool.uv.sources]`, so a fresh clone resolves from
+  # PyPI. This pins that shut: if a local path source is ever added, CI still
+  # proves the *published* dependencies are sufficient.
+  UV_NO_SOURCES: "1"
+
+jobs:
+  check:
+    name: Lint, offline tests, end-to-end SQL
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --no-sources --all-extras
+      - name: Ruff (lint)
+        run: uv run --no-sources ruff check .
+      - name: Ruff (format)
+        run: uv run --no-sources ruff format --check .
+      # Includes tests/test_end_to_end.py: a real ATTACH against a local fake of
+      # the Admin API, so it needs no key and no network, and runs on every push.
+      - name: Tests
+        run: uv run --no-sources pytest -q
+      - name: Entry points start without the dev checkouts
+        run: |
+          uv run --no-project anthropic_worker.py --help > /dev/null
+          uv run --no-project serve.py --help > /dev/null
+
+  catalog:
+    name: Catalog metadata (vgi-lint, structural)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --no-sources
+      # Structural tier only. The behavioural tier executes every example
+      # against a real organization and needs an Admin key — see live.yml.
+      - name: vgi-lint (structural)
+        run: >
+          uvx --no-sources --from vgi-lint-check==0.82.0 vgi-lint lint "uv run --no-sources anthropic_worker.py"
+          --no-execute --no-check-links --audit-waivers --fail-on warning
+      # Every shipped example executed, and every expected_result compared,
+      # against the local fake Admin API — no key, no network.
+      - name: vgi-lint (behavioural, against the fake API)
+        run: scripts/lint-behavioural.sh

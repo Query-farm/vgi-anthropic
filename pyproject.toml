@@ -1,0 +1,83 @@
+[project]
+name = "vgi-anthropic"
+dynamic = ["version"]
+description = "A read-only VGI (Vector Gateway Interface) worker exposing the Anthropic Admin, Usage and Cost APIs to DuckDB/SQL"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Query Farm", email = "hello@query.farm" }]
+keywords = ["vgi", "duckdb", "arrow", "anthropic", "claude", "usage", "cost", "admin", "sql"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
+]
+requires-python = ">=3.13"
+dependencies = [
+    # `haybarn` is not optional: vgi-python binds a pushed-down WHERE clause with
+    # an in-process DuckDB engine, and without one every filtered scan fails at
+    # runtime with "No DuckDB-compatible engine is installed". The offline tests
+    # cannot see this, because the dev group brings in `duckdb` as a fallback.
+    "vgi-python[http,haybarn]>=0.37.3",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+serve = ["vgi-python[http,haybarn,oauth]>=0.37.3", "vgi-rpc[sentry]>=0.47.2"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    # Pinned to a minor: the rule set is version-dependent, so an unpinned ruff
+    # means CI can fail on a commit that was clean locally.
+    "ruff>=0.16,<0.17",
+    # Drives a real ATTACH in tests/test_end_to_end.py, against a local fake of
+    # the Admin API — the only way to exercise argument casting, projection and
+    # filter pushdown the way the DuckDB extension actually performs them.
+    "duckdb>=1.1",
+    # DuckDB materializes TIMESTAMP WITH TIME ZONE through pytz; without it a
+    # scan that returns one fails at fetch time, not at bind.
+    "pytz>=2024.1",
+    # Not used by the worker. tests/test_sdk_conformance.py validates the fake
+    # Admin API's payloads against the SDK's generated models, which is the
+    # closest offline substitute for a real organization's responses.
+    "anthropic>=1.11.0",
+]
+
+[project.urls]
+Homepage = "https://query.farm"
+Documentation = "https://query.farm/vgi/"
+Repository = "https://github.com/Query-farm/vgi-anthropic"
+Issues = "https://github.com/Query-farm/vgi-anthropic/issues"
+
+[project.scripts]
+vgi-anthropic = "vgi_anthropic.worker:main"
+vgi-anthropic-http = "vgi_anthropic.worker:main_http"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "vgi_anthropic/__init__.py"
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+
+# Selected explicitly rather than left to the default set, which changes between
+# ruff releases, so CI and a developer's shell agree about the same commit.
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Live tests hit the real Admin API with a real key; opt in with `pytest -m live`.
+addopts = "-m 'not live'"
+markers = ["live: hits the real Anthropic Admin API (needs ANTHROPIC_ADMIN_API_KEY)"]
