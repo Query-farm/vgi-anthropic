@@ -13,14 +13,13 @@ these catch is drift: a renamed field, a changed page shape, a new enum value.
 from __future__ import annotations
 
 import os
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from tests.duckdb_session import connect
+from tests.duckdb_session import connect, worker_location
 
 pytestmark = pytest.mark.live
 
@@ -34,9 +33,7 @@ def con() -> Iterator[Any]:
         pytest.skip("set ANTHROPIC_ADMIN_API_KEY to run the live tests")
     connection = connect()
     connection.execute("SET TimeZone = 'UTC'")
-    connection.execute(
-        f"ATTACH 'anthropic' (TYPE vgi, LOCATION '{sys.executable} {ROOT / 'anthropic_worker.py'}')"
-    )
+    connection.execute(f"ATTACH 'anthropic' (TYPE vgi, LOCATION '{worker_location('anthropic_worker.py')}')")
     # CREATE SECRET takes no bound parameters, so the key is quoted inline.
     quoted = KEY.replace("'", "''")
     connection.execute(f"CREATE SECRET live (TYPE anthropic_admin, api_key '{quoted}')")

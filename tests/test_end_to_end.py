@@ -14,7 +14,6 @@ optional argument's default was rejected by the framework at catalog time.
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Iterator
 from decimal import Decimal
 from pathlib import Path
@@ -22,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from tests.duckdb_session import connect
+from tests.duckdb_session import connect, worker_location
 from tests.fake_admin_api import (
     ADMIN_KEY,
     ORG_SCOPED_KEY,
@@ -47,7 +46,7 @@ def _attach(fake: FakeAdminApi, monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setenv("VGI_ANTHROPIC_BASE_URL", fake.url)
     con = connect()
     con.execute("SET TimeZone = 'UTC'")
-    con.execute(f"ATTACH 'anthropic' (TYPE vgi, LOCATION '{sys.executable} {ROOT / 'anthropic_worker.py'}')")
+    con.execute(f"ATTACH 'anthropic' (TYPE vgi, LOCATION '{worker_location('anthropic_worker.py')}')")
     return con
 
 

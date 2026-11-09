@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VGI_LINT="${VGI_LINT:-uvx --from vgi-lint-check==0.82.0 vgi-lint}"
+VGI_LINT="${VGI_LINT:-uvx --from vgi-lint-check==2.1.0 vgi-lint}"
 WORKER="${WORKER:-uv run --no-sources anthropic_worker.py}"
 url_file="$(mktemp)"
 

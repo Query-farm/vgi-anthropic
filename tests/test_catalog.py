@@ -65,7 +65,7 @@ class TestDocumentation:
     def test_every_table_is_documented_and_keyed(self) -> None:
         for table in SCHEMA.tables:
             assert table.comment and table.tags["vgi.doc_llm"], table.name
-            assert table.primary_key, table.name
+            assert any(c.definition.kind == "PRIMARY_KEY" for c in table.constraints), table.name
             assert table.function.Meta.name == f"all_{table.name}", table.name
 
     def test_catalog_level_tags_parse(self) -> None:

@@ -23,9 +23,16 @@ import sys
 from typing import Any
 
 from vgi import Worker
-from vgi.catalog import Catalog, ReadOnlyCatalogInterface, Schema
+from vgi.catalog import (
+    Catalog,
+    ConstraintInfo,
+    ReadOnlyCatalogInterface,
+    ReferencedKey,
+    Schema,
+    constraint_record,
+)
 from vgi.catalog.catalog_interface import CatalogInfo
-from vgi.catalog.descriptors import ForeignKeyDef, Table
+from vgi.catalog.descriptors import Table
 
 from vgi_anthropic import __version__, auth
 from vgi_anthropic.admin import (
@@ -315,6 +322,48 @@ def _table_docs(
     )
 
 
+def _constraints(
+    table: str,
+    *,
+    key: tuple[str, ...],
+    not_null: tuple[str, ...],
+    references: tuple[tuple[str, str], ...] = (),
+) -> tuple[ConstraintInfo, ...]:
+    """Canonical vgi.v3 constraint records: NOT NULL columns, the primary key, and foreign keys.
+
+    ``references`` pairs a column with the table whose single-column ``id`` key it references.
+    The tables are read-only, so each record is a statement about every row the API returns.
+    """
+
+    def record(constraint_id: str, kind: str, columns: list[list[str]], **extra: Any) -> ConstraintInfo:
+        return constraint_record(
+            ["main"],
+            table,
+            constraint_id,
+            kind,
+            columns,
+            enforcement="ENFORCED",
+            validation="ALL_ROWS",
+            **extra,
+        )
+
+    return (
+        *(record(f"{col}_not_null", "NOT_NULL", [[col]]) for col in not_null),
+        record("pk", "PRIMARY_KEY", [[col] for col in key]),
+        *(
+            record(
+                f"{col}_fk",
+                "FOREIGN_KEY",
+                [[col]],
+                references=ReferencedKey(
+                    schema_path=["main"], table=target, columns=[["id"]], constraint_id="pk"
+                ),
+            )
+            for col, target in references
+        ),
+    )
+
+
 _TABLES = [
     Table(
         name="organization",
@@ -330,8 +379,7 @@ _TABLES = [
             terms=("organization", "account"),
         ),
         column_comments=column_comments(ORGANIZATION_SCHEMA),
-        primary_key=(("id",),),
-        not_null=("id",),
+        constraints=_constraints("organization", key=("id",), not_null=("id",)),
         cardinality_estimate=1,
         cardinality_max=1,
     ),
@@ -355,8 +403,7 @@ _TABLES = [
             terms=("users", "members", "roles", "people"),
         ),
         column_comments=column_comments(USER_SCHEMA),
-        primary_key=(("id",),),
-        not_null=("id",),
+        constraints=_constraints("users", key=("id",), not_null=("id",)),
     ),
     Table(
         name="invites",
@@ -372,8 +419,7 @@ _TABLES = [
             terms=("invites", "invitations", "onboarding"),
         ),
         column_comments=column_comments(INVITE_SCHEMA),
-        primary_key=(("id",),),
-        not_null=("id",),
+        constraints=_constraints("invites", key=("id",), not_null=("id",)),
     ),
     Table(
         name="workspaces",
@@ -396,8 +442,7 @@ _TABLES = [
             terms=("workspaces", "projects", "environments"),
         ),
         column_comments=column_comments(WORKSPACE_SCHEMA),
-        primary_key=(("id",),),
-        not_null=("id",),
+        constraints=_constraints("workspaces", key=("id",), not_null=("id",)),
     ),
     Table(
         name="workspace_members",
@@ -419,13 +464,11 @@ _TABLES = [
             terms=("workspace members", "access", "roles"),
         ),
         column_comments=column_comments(WORKSPACE_MEMBER_SCHEMA),
-        primary_key=(("workspace_id", "user_id"),),
-        not_null=("workspace_id", "user_id"),
-        foreign_key=(
-            ForeignKeyDef(
-                columns=("workspace_id",), referenced_table="workspaces", referenced_columns=("id",)
-            ),
-            ForeignKeyDef(columns=("user_id",), referenced_table="users", referenced_columns=("id",)),
+        constraints=_constraints(
+            "workspace_members",
+            key=("workspace_id", "user_id"),
+            not_null=("workspace_id", "user_id"),
+            references=(("workspace_id", "workspaces"), ("user_id", "users")),
         ),
     ),
     Table(
@@ -452,8 +495,7 @@ _TABLES = [
             terms=("api keys", "credentials", "security", "audit"),
         ),
         column_comments=column_comments(API_KEY_SCHEMA),
-        primary_key=(("id",),),
-        not_null=("id",),
+        constraints=_constraints("api_keys", key=("id",), not_null=("id",)),
         # No foreign key to `workspaces`: a key in the default workspace carries
         # that workspace's real ID, which the workspace list does not include, so
         # the constraint would be false.
@@ -478,8 +520,7 @@ _TABLES = [
             terms=("rate limits", "rpm", "tpm", "quota"),
         ),
         column_comments=column_comments(RATE_LIMIT_SCHEMA),
-        primary_key=(("id", "limit_type"),),
-        not_null=("id", "limit_type"),
+        constraints=_constraints("rate_limits", key=("id", "limit_type"), not_null=("id", "limit_type")),
     ),
     Table(
         name="workspace_rate_limits",
@@ -507,14 +548,13 @@ _TABLES = [
             terms=("rate limits", "workspace", "overrides"),
         ),
         column_comments=column_comments(WORKSPACE_RATE_LIMIT_SCHEMA),
-        primary_key=(("workspace_id", "rate_limit_id", "limit_type"),),
-        not_null=("workspace_id", "limit_type"),
         # rate_limit_id joins to rate_limits.id, but that is not a key there (one
         # row per limiter), so it cannot be declared as a foreign key.
-        foreign_key=(
-            ForeignKeyDef(
-                columns=("workspace_id",), referenced_table="workspaces", referenced_columns=("id",)
-            ),
+        constraints=_constraints(
+            "workspace_rate_limits",
+            key=("workspace_id", "rate_limit_id", "limit_type"),
+            not_null=("workspace_id", "limit_type"),
+            references=(("workspace_id", "workspaces"),),
         ),
     ),
 ]

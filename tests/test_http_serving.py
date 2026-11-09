@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -20,7 +19,7 @@ from typing import Any
 
 import pytest
 
-from tests.duckdb_session import connect
+from tests.duckdb_session import connect, worker_command
 from tests.fake_admin_api import ADMIN_KEY, FakeAdminApi
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,8 +32,7 @@ def server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     port_file = tmp_path_factory.mktemp("serve") / "port"
     proc = subprocess.Popen(
         [
-            sys.executable,
-            str(ROOT / "serve.py"),
+            *worker_command("serve.py"),
             "--host",
             "127.0.0.1",
             "--port",

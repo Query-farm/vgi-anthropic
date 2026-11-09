@@ -18,13 +18,12 @@ and nothing is ever answered with an empty result instead of an error.
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from tests.duckdb_session import connect
+from tests.duckdb_session import connect, worker_location
 
 pytestmark = pytest.mark.live
 
@@ -35,7 +34,7 @@ NON_ADMIN_KEY = os.environ.get("ANTHROPIC_NON_ADMIN_KEY", "")
 
 def _connect(key: str) -> Any:
     con = connect()
-    con.execute(f"ATTACH 'anthropic' (TYPE vgi, LOCATION '{sys.executable} {ROOT / 'anthropic_worker.py'}')")
+    con.execute(f"ATTACH 'anthropic' (TYPE vgi, LOCATION '{worker_location('anthropic_worker.py')}')")
     quoted = key.replace("'", "''")
     con.execute(f"CREATE SECRET (TYPE anthropic_admin, api_key '{quoted}')")
     return con
