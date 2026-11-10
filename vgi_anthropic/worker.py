@@ -240,6 +240,9 @@ _COMMON = {"provider": "anthropic", "domain": "ai-platform-administration"}
 _CATALOG_TAGS = {
     **_COMMON,
     "vgi.title": "Anthropic Admin, Usage & Cost",
+    "vgi.subtitle": (
+        "Read-only view of your Anthropic organization's members, API keys, token usage and cost."
+    ),
     "vgi.source_url": SOURCE_URL,
     "vgi.author": "Query Farm LLC <hello@query.farm>",
     "vgi.copyright": (
