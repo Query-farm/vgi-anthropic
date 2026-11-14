@@ -1,7 +1,7 @@
 """Run a worker script with the `haybarn` module hidden: ``python tests/run_worker.py SCRIPT [ARGS...]``.
 
 The dev environment carries Haybarn 2.0 as the SQL client the tests drive (its
-vgi extension speaks protocol 3.2), and the worker's runtime dependency, stock
+vgi extension speaks protocol 3.3), and the worker's runtime dependency, stock
 DuckDB 1.5.5, as vgi-python's filter evaluator. vgi-python prefers `haybarn`
 when both import, and its vgi.duckdb.standard.v1 evaluator refuses Haybarn 2.0,
 so a worker launched with the dev interpreter as-is would fail every pushed-down

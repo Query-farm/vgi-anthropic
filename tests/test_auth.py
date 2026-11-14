@@ -82,3 +82,10 @@ class TestForCall:
 def test_the_secret_values_are_redacted() -> None:
     redacted = {f.name for f in auth.SECRET_SPEC.schema if (f.metadata or {}).get(b"redact") == b"true"}
     assert redacted == {"api_key", "oauth_token"}
+
+
+def test_every_secret_value_is_documented_for_create_secret() -> None:
+    # vgi-lint VGI1011/VGI1012: DuckDB shows these when someone writes CREATE SECRET.
+    for field in auth.SECRET_SPEC.schema:
+        assert (field.metadata or {}).get(b"vgi_doc"), field.name
+    assert (auth.SECRET_SPEC.schema.metadata or {}).get(b"vgi_doc_url", b"").startswith(b"https://")

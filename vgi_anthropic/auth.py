@@ -54,9 +54,31 @@ SECRET_SPEC = SecretTypeSpec(
     ),
     schema=pa.schema(
         [
-            pa.field(API_KEY, pa.string(), metadata={"redact": "true"}),
-            pa.field(OAUTH_TOKEN, pa.string(), metadata={"redact": "true"}),
-        ]
+            pa.field(
+                API_KEY,
+                pa.string(),
+                metadata={
+                    "redact": "true",
+                    "vgi_doc": (
+                        "An Admin API key (sk-ant-admin01-...) from Console > Settings > Admin keys, "
+                        "or an organization-scoped personal or service-account key. Set this or "
+                        "oauth_token."
+                    ),
+                },
+            ),
+            pa.field(
+                OAUTH_TOKEN,
+                pa.string(),
+                metadata={
+                    "redact": "true",
+                    "vgi_doc": (
+                        "An OAuth access token carrying the org:admin scope. Used only when api_key "
+                        "is not set."
+                    ),
+                },
+            ),
+        ],
+        metadata={"vgi_doc_url": "https://docs.anthropic.com/en/api/administration-api"},
     ),
 )
 

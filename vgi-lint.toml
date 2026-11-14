@@ -20,3 +20,43 @@ schema, so the scan takes the `all_` prefix and the table keeps the name \
 consumers actually type.\
 """ },
 ]
+
+# The relationships VGI808/VGI809 suggest are real joins, documented in the
+# tables' doc_md, but none can be declared as a FOREIGN KEY without lying.
+[per_object."anthropic.main.api_keys"]
+ignore = [
+  { code = "VGI808", kind = "domain-exemption", reason = """\
+A key in the default workspace carries that workspace's real ID, and the \
+default workspace is not in `workspaces` (the API does not list it), so a \
+FOREIGN KEY to workspaces would be false for those rows.\
+""" },
+]
+
+[per_object."anthropic.main.workspace_rate_limits"]
+ignore = [
+  { code = "VGI808", kind = "domain-exemption", reason = """\
+rate_limit_id joins to rate_limits.id, but that is not a key there: rate_limits \
+has one row per (id, limit_type), so a single-column FOREIGN KEY cannot be declared.\
+""" },
+  { code = "VGI809", kind = "domain-exemption", reason = """\
+group_id is the rate-limit group's identifier, copied onto each workspace row \
+for filtering; it is not a key of rate_limits (one row per limiter), so no \
+FOREIGN KEY can reference it.\
+""" },
+]
+
+[per_object."anthropic.main.rate_limits"]
+ignore = [
+  { code = "VGI809", kind = "domain-exemption", reason = """\
+group_id repeats across this table's rows (one per limiter); the same value in \
+workspace_rate_limits is a copy, not a reference that a FOREIGN KEY could declare.\
+""" },
+]
+
+[per_object."anthropic.main.organization"]
+ignore = [
+  { code = "VGI144", kind = "domain-exemption", reason = """\
+Exactly one row: the organization the credential belongs to. There is no \
+collection to pluralize, and `organizations` would suggest a list.\
+""" },
+]
