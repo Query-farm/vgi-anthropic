@@ -41,6 +41,12 @@ SELECT COALESCE(w.name, 'Default') AS workspace, c.model, sum(c.amount_usd) AS u
 FROM anthropic.cost_report(date_trunc('month', current_date)) c
 LEFT JOIN anthropic.workspaces w ON w.id = c.workspace_id
 GROUP BY ALL ORDER BY usd DESC;
+
+-- Which roles use Claude Code, and what does it cost? (8 days, today included)
+SELECT u.role, sum(c.num_sessions) AS sessions, sum(c.estimated_cost_usd) AS usd
+FROM anthropic.claude_code_usage(current_date - INTERVAL 7 DAY, ending_date => current_date) c
+JOIN anthropic.users u ON u.email = c.email_address
+GROUP BY u.role ORDER BY sessions DESC;
 ```
 
 ## Run

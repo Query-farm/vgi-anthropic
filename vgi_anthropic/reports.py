@@ -268,6 +268,25 @@ _USAGE_SQL = (
 )
 
 
+#: Composed with `rate_limits`: a limit applies to a model *group*, so usage is
+#: summed per minute across the group's models before taking the peak.
+PEAK_OTPM_VS_LIMIT_SQL = (
+    "WITH per_minute AS (SELECT u.bucket_start, r.group_display_name, r.value AS otpm_limit, "
+    "sum(u.output_tokens) AS otpm "
+    "FROM anthropic.main.messages_usage(current_date, bucket_width => '1m') u "
+    "JOIN anthropic.main.rate_limits r ON list_contains(r.models, u.model) "
+    "AND r.limit_type = 'output_tokens_per_minute' GROUP BY ALL) "
+    "SELECT group_display_name, otpm_limit, max(otpm) AS peak_otpm, "
+    "round(100.0 * max(otpm) / otpm_limit, 2) AS peak_pct_of_limit "
+    "FROM per_minute GROUP BY group_display_name, otpm_limit ORDER BY peak_pct_of_limit DESC"
+)
+PEAK_OTPM_VS_LIMIT = (
+    "Today's peak output tokens per minute in each model group with usage, as a share of "
+    "that group's output-tokens-per-minute limit",
+    PEAK_OTPM_VS_LIMIT_SQL,
+)
+
+
 @init_single_worker
 class MessagesUsageFunction(TableFunctionGenerator[UsageArgs, WalkState]):
     """Token usage of the Messages API, bucketed by time."""
@@ -325,9 +344,13 @@ class MessagesUsageFunction(TableFunctionGenerator[UsageArgs, WalkState]):
                     "LEFT JOIN anthropic.main.api_keys k ON k.id = u.api_key_id "
                     "GROUP BY k.name ORDER BY output_tokens DESC",
                 ),
+                PEAK_OTPM_VS_LIMIT,
             ),
         )
-        examples = [FunctionExample(sql=_USAGE_SQL, description="Token volume by model over the last week")]
+        examples = [
+            FunctionExample(sql=_USAGE_SQL, description="Token volume by model over the last week"),
+            FunctionExample(sql=PEAK_OTPM_VS_LIMIT_SQL, description=PEAK_OTPM_VS_LIMIT[0]),
+        ]
 
     @classmethod
     def on_bind(cls, params: BindParams[UsageArgs]) -> BindResponse:
@@ -435,6 +458,24 @@ _COST_SQL = (
 )
 
 
+#: Composed with `messages_usage`: dollars from the Cost API over tokens from the
+#: Usage API, per model. Every token type counts, so this is a blended rate.
+COST_PER_MILLION_TOKENS_SQL = (
+    "WITH spend AS (SELECT model, sum(amount_usd) AS usd "
+    "FROM anthropic.main.cost_report(date_trunc('month', current_date)) "
+    "WHERE model IS NOT NULL GROUP BY model), "
+    "tokens AS (SELECT model, sum(uncached_input_tokens + cache_read_input_tokens "
+    "+ cache_creation_5m_input_tokens + cache_creation_1h_input_tokens + output_tokens) AS tokens "
+    "FROM anthropic.main.messages_usage(date_trunc('month', current_date)) GROUP BY model) "
+    "SELECT s.model, s.usd, t.tokens, round(s.usd * 1000000 / nullif(t.tokens, 0), 2) "
+    "AS usd_per_million_tokens FROM spend s JOIN tokens t USING (model) ORDER BY s.usd DESC"
+)
+COST_PER_MILLION_TOKENS = (
+    "Month-to-date spend, tokens and blended dollars per million tokens, by model",
+    COST_PER_MILLION_TOKENS_SQL,
+)
+
+
 @init_single_worker
 class CostReportFunction(TableFunctionGenerator[CostArgs, WalkState]):
     """Daily cost in USD, optionally by workspace and line item."""
@@ -483,9 +524,13 @@ class CostReportFunction(TableFunctionGenerator[CostArgs, WalkState]):
                     "LEFT JOIN anthropic.main.workspaces w ON w.id = c.workspace_id "
                     "GROUP BY ALL ORDER BY day, workspace",
                 ),
+                COST_PER_MILLION_TOKENS,
             ),
         )
-        examples = [FunctionExample(sql=_COST_SQL, description="Month-to-date spend by model")]
+        examples = [
+            FunctionExample(sql=_COST_SQL, description="Month-to-date spend by model"),
+            FunctionExample(sql=COST_PER_MILLION_TOKENS_SQL, description=COST_PER_MILLION_TOKENS[0]),
+        ]
 
     @classmethod
     def on_bind(cls, params: BindParams[CostArgs]) -> BindResponse:
@@ -566,6 +611,28 @@ _CLAUDE_CODE_SQL = (
 )
 
 
+#: Composed with `users`: Claude Code activity rolled up by organization role.
+CLAUDE_CODE_BY_ROLE_SQL = (
+    "SELECT u.role, count(DISTINCT u.email) AS people, sum(c.num_sessions) AS sessions, "
+    "sum(c.lines_added) AS lines_added, sum(c.estimated_cost_usd) AS usd "
+    "FROM anthropic.main.claude_code_usage(current_date - INTERVAL 7 DAY, ending_date => current_date) c "
+    "JOIN anthropic.main.users u ON u.email = c.email_address "
+    "GROUP BY u.role ORDER BY sessions DESC"
+)
+CLAUDE_CODE_BY_ROLE = (
+    "Claude Code sessions, lines added and estimated cost over the last week, by organization role",
+    CLAUDE_CODE_BY_ROLE_SQL,
+)
+
+#: Composed with `users`: the members with no Claude Code activity at all.
+NO_CLAUDE_CODE_SQL = (
+    "SELECT u.email, u.role FROM anthropic.main.users u WHERE u.email NOT IN ("
+    "SELECT email_address FROM anthropic.main.claude_code_usage(current_date - INTERVAL 30 DAY, "
+    "ending_date => current_date) WHERE email_address IS NOT NULL) ORDER BY u.email"
+)
+NO_CLAUDE_CODE = ("Members who have not used Claude Code in the last 30 days", NO_CLAUDE_CODE_SQL)
+
+
 @init_single_worker
 class ClaudeCodeUsageFunction(TableFunctionGenerator[ClaudeCodeArgs, WalkState]):
     """Daily Claude Code productivity and spend, per user or API key."""
@@ -613,9 +680,13 @@ class ClaudeCodeUsageFunction(TableFunctionGenerator[ClaudeCodeArgs, WalkState])
                     "AS acceptance FROM anthropic.main.claude_code_usage(current_date - INTERVAL 14 DAY, "
                     "ending_date => current_date) GROUP BY date ORDER BY date",
                 ),
+                CLAUDE_CODE_BY_ROLE,
             ),
         )
-        examples = [FunctionExample(sql=_CLAUDE_CODE_SQL, description="Last week's Claude Code leaderboard")]
+        examples = [
+            FunctionExample(sql=_CLAUDE_CODE_SQL, description="Last week's Claude Code leaderboard"),
+            FunctionExample(sql=CLAUDE_CODE_BY_ROLE_SQL, description=CLAUDE_CODE_BY_ROLE[0]),
+        ]
 
     @classmethod
     def on_bind(cls, params: BindParams[ClaudeCodeArgs]) -> BindResponse:

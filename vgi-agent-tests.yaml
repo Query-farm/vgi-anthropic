@@ -126,3 +126,21 @@ tasks:
       SELECT name, status, workspace_id FROM anthropic.main.api_key_by_id(
       (SELECT id FROM anthropic.main.api_keys ORDER BY created_at DESC LIMIT 1))
     success_criteria: Reports the newest API key's status and workspace, by api_key_by_id or the table.
+
+  # Live data: graded by check_sql against the agent's `answer`, recomputed at
+  # grading time. The trap is the fan-out: an admin of two workspaces appears
+  # twice in workspace_members, so a plain three-way join double-counts them.
+  - name: workspace_admins_claude_code
+    check_sql: >-
+      WITH truth AS (SELECT c.email_address AS email, sum(c.num_sessions) AS sessions
+      FROM anthropic.main.claude_code_usage(current_date - INTERVAL 7 DAY, ending_date => current_date) c
+      WHERE c.email_address IN (SELECT u.email FROM anthropic.main.workspace_members m
+      JOIN anthropic.main.users u ON u.id = m.user_id WHERE m.workspace_role = 'workspace_admin')
+      GROUP BY c.email_address HAVING sum(c.num_sessions) > 0)
+      SELECT (SELECT count(*) FROM answer) = (SELECT count(*) FROM truth)
+      AND NOT EXISTS (SELECT email, sessions FROM truth
+      EXCEPT SELECT email::VARCHAR, sessions::BIGINT FROM answer)
+    success_criteria: >-
+      Restricts claude_code_usage to emails of users holding workspace_admin in
+      workspace_members, counting each admin once even when they administer
+      several workspaces, and sums num_sessions over the 8-day inclusive range.

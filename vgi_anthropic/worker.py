@@ -48,7 +48,13 @@ from vgi_anthropic.admin import (
 )
 from vgi_anthropic.lookups import LOOKUP_FUNCTIONS
 from vgi_anthropic.meta import column_comments, docs, examples, keywords
-from vgi_anthropic.reports import REPORT_FUNCTIONS
+from vgi_anthropic.reports import (
+    CLAUDE_CODE_BY_ROLE,
+    COST_PER_MILLION_TOKENS,
+    NO_CLAUDE_CODE,
+    PEAK_OTPM_VS_LIMIT,
+    REPORT_FUNCTIONS,
+)
 from vgi_anthropic.schemas import (
     API_KEY_SCHEMA,
     INVITE_SCHEMA,
@@ -97,6 +103,11 @@ _EXAMPLE_QUERIES = examples(
         "FROM anthropic.main.claude_code_usage(current_date - INTERVAL 7 DAY, ending_date => current_date) "
         "WHERE actor_type = 'user_actor' GROUP BY email_address ORDER BY usd DESC",
     ),
+    # Composed: each joins two of the catalog's objects (see reports.py).
+    CLAUDE_CODE_BY_ROLE,
+    NO_CLAUDE_CODE,
+    PEAK_OTPM_VS_LIMIT,
+    COST_PER_MILLION_TOKENS,
 )
 
 #: Examples the linter runs against a live worker. Every organization has
@@ -190,6 +201,12 @@ _AGENT_TEST_TASKS = json.dumps(
                 "What are the data-residency settings of our most recently created workspace?",
             ),
             ("newest_key_status", "What is the status of our newest API key, and which workspace is it in?"),
+            (
+                "workspace_admins_claude_code",
+                "Which of our workspace admins used Claude Code from 7 days ago through today (inclusive), "
+                "and how many sessions did each run in total? Return one row per admin with columns "
+                "email and sessions; leave out admins with no sessions.",
+            ),
         ]
     ]
 )
@@ -314,13 +331,21 @@ _SCHEMA_TAGS = {
 
 
 def _table_docs(
-    *, category: str, title: str, llm: str, md: str, sql: str, description: str, terms: tuple[str, ...]
+    *,
+    category: str,
+    title: str,
+    llm: str,
+    md: str,
+    sql: str,
+    description: str,
+    terms: tuple[str, ...],
+    more_examples: tuple[tuple[str, str], ...] = (),
 ) -> dict[str, str]:
     return docs(
         category=category,
         llm=llm,
         md=md,
-        example_queries=examples((description, sql)),
+        example_queries=examples((description, sql), *more_examples),
         extra={**_COMMON, "vgi.title": title, "vgi.keywords": keywords(*terms)},
     )
 
@@ -404,6 +429,7 @@ _TABLES = [
             sql="SELECT role, count(*) AS members FROM anthropic.main.users GROUP BY role",
             description="Members by role",
             terms=("users", "members", "roles", "people"),
+            more_examples=(NO_CLAUDE_CODE,),
         ),
         column_comments=column_comments(USER_SCHEMA),
         constraints=_constraints("users", key=("id",), not_null=("id",)),
@@ -521,6 +547,7 @@ _TABLES = [
             ),
             description="Limits per model group",
             terms=("rate limits", "rpm", "tpm", "quota"),
+            more_examples=(PEAK_OTPM_VS_LIMIT,),
         ),
         column_comments=column_comments(RATE_LIMIT_SCHEMA),
         constraints=_constraints("rate_limits", key=("id", "limit_type"), not_null=("id", "limit_type")),
