@@ -337,6 +337,11 @@ deliberately wrong expectation passed until they were moved.
 with the `ANTHROPIC_ADMIN_API_KEY` repository secret — a fork's pull request
 could otherwise read a real organization's members, keys and spend.
 
+## Notebooks
+
+[Executed SQL walkthrough: recovering default-workspace spend](notebooks/README.md)
+uses a synthetic local Admin API with the real worker; no credentials are needed.
+
 ## License
 
 Copyright © 2026 [Query Farm LLC](https://query.farm)
