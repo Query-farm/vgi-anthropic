@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — 2026-10-02
+## 0.1.0 — 2026-11-14
 
 First release: the Anthropic Admin, Usage & Cost, and Claude Code Analytics
 APIs as a read-only VGI catalog.
@@ -36,4 +36,11 @@ APIs as a read-only VGI catalog.
   SDK's models.
 - `vgi-lint`'s behavioural tier runs in CI against the fake
   (`scripts/lint-behavioural.sh`), comparing every example's declared result.
+- **Composed example queries** that join the catalog's objects: Claude Code
+  activity by organization role (`claude_code_usage` + `users`), members with
+  no Claude Code activity in 30 days, per-minute output tokens against each
+  model group's OTPM limit (`messages_usage` + `rate_limits`), and
+  month-to-date blended dollars per million tokens (`cost_report` +
+  `messages_usage`).
+- Speaks VGI protocol 3.3 (vgi-python >= 0.51.1).
 - Live tests of every refusal the real API gives a non-admin credential.
