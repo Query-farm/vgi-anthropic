@@ -7,6 +7,9 @@
 - Docs link to upstream: the catalog documentation now links the Anthropic Admin
   API, Usage and Cost API and Claude Code Analytics API references, and the
   Console page where an Admin API key is created (vgi-lint VGI183).
+- Docs give an overview, not a function list: the catalog documentation now
+  describes the records-as-tables / reports-as-functions shape without naming
+  every object (vgi-lint VGI173).
 
 ## 0.1.0 — 2026-11-14
 
