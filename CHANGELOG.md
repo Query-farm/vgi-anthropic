@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1 — 2026-11-14
+
+### Changed
+
+- Docs link to upstream: the catalog documentation now links the Anthropic Admin
+  API, Usage and Cost API and Claude Code Analytics API references, and the
+  Console page where an Admin API key is created (vgi-lint VGI183).
+
 ## 0.1.0 — 2026-11-14
 
 First release: the Anthropic Admin, Usage & Cost, and Claude Code Analytics

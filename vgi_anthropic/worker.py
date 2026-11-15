@@ -280,7 +280,9 @@ _CATALOG_TAGS = {
         "Reach for it to answer who has access to what, what is being used and by which key or "
         "workspace, and what it costs. Requires an Admin API key (or organization-scoped key) "
         "in an `anthropic_admin` secret. "
-        "Read-only: it cannot change members, keys or workspaces, and it does not call models."
+        "Read-only: it cannot change members, keys or workspaces, and it does not call models. "
+        "Upstream API reference: https://platform.claude.com/docs/en/manage-claude/admin-api and "
+        "https://platform.claude.com/docs/en/manage-claude/usage-cost-api."
     ),
     "vgi.doc_md": (
         "The Anthropic Admin API, Usage & Cost API and Claude Code Analytics API as SQL.\n\n"
@@ -298,7 +300,15 @@ _CATALOG_TAGS = {
         "IDs join across all of them.\n\n"
         "### Read-only\n\n"
         "The Admin API can invite and remove members, archive workspaces and disable keys. This "
-        "worker issues `GET` requests only, enforced structurally and by a CI guard."
+        "worker issues `GET` requests only, enforced structurally and by a CI guard.\n\n"
+        "### Sources and references\n\n"
+        "The data comes from the [Anthropic Admin API]"
+        "(https://platform.claude.com/docs/en/manage-claude/admin-api), the [Usage and Cost API]"
+        "(https://platform.claude.com/docs/en/manage-claude/usage-cost-api) and the "
+        "[Claude Code Analytics API]"
+        "(https://platform.claude.com/docs/en/manage-claude/claude-code-analytics-api). An "
+        "organization admin creates the Admin API key under "
+        "[Admin keys in the Claude Console](https://platform.claude.com/settings/admin-keys)."
     ),
 }
 
