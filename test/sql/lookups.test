@@ -1,0 +1,53 @@
+# name: test/sql/lookups.test
+# description: Point lookups by ID, LATERAL composition
+# group: [anthropic]
+#
+# Runs offline against the fake Admin API (test/mock_api/server.py, fixed clock
+# 2026-09-10 UTC) through ci/run-integration.sh; the key below is the fake's
+# test key, not a credential.
+
+require vgi
+
+require-env VGI_ANTHROPIC_WORKER
+
+require-env VGI_ANTHROPIC_BASE_URL
+
+statement ok
+ATTACH 'anthropic' (TYPE vgi, LOCATION '{VGI_ANTHROPIC_WORKER}');
+
+statement ok
+CREATE SECRET acme (TYPE anthropic_admin, api_key 'sk-ant-admin01-test-key');
+
+query T
+SELECT email FROM anthropic.main.user_by_id('user_02');
+----
+person2@acme.test
+
+# An unknown ID is no row, not an error.
+query I
+SELECT count(*) FROM anthropic.main.user_by_id('user_gone');
+----
+0
+
+# A path-traversing ID stays in its URL segment.
+query I
+SELECT count(*) FROM anthropic.main.user_by_id('../invites');
+----
+0
+
+# apikey_02 was created by a service account, which is not a user.
+query TT
+SELECT k.id, u.email FROM anthropic.main.api_keys k, LATERAL anthropic.main.user_by_id(k.created_by_id) u ORDER BY k.id;
+----
+apikey_01	person1@acme.test
+apikey_03	person2@acme.test
+
+query I
+SELECT is_archived FROM anthropic.main.workspace_by_id('wrkspc_03');
+----
+true
+
+query T
+SELECT workspace_id FROM anthropic.main.api_key_by_id('apikey_03');
+----
+wrkspc_default

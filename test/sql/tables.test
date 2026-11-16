@@ -1,0 +1,96 @@
+# name: test/sql/tables.test
+# description: Admin API tables: paging, flattening, nested columns
+# group: [anthropic]
+#
+# Runs offline against the fake Admin API (test/mock_api/server.py, fixed clock
+# 2026-09-10 UTC) through ci/run-integration.sh; the key below is the fake's
+# test key, not a credential.
+
+require vgi
+
+require-env VGI_ANTHROPIC_WORKER
+
+require-env VGI_ANTHROPIC_BASE_URL
+
+statement ok
+ATTACH 'anthropic' (TYPE vgi, LOCATION '{VGI_ANTHROPIC_WORKER}');
+
+statement ok
+CREATE SECRET acme (TYPE anthropic_admin, api_key 'sk-ant-admin01-test-key');
+
+query T
+SELECT name FROM anthropic.main.organization;
+----
+Acme Robotics
+
+# 5 users at the fake's 2 per page: the cursor is followed to the end.
+query T
+SELECT id FROM anthropic.main.users ORDER BY id;
+----
+user_01
+user_02
+user_03
+user_04
+user_05
+
+query TT
+SELECT role, count(*) FROM anthropic.main.users GROUP BY role ORDER BY role;
+----
+admin	1
+billing	1
+developer	2
+user	1
+
+query I
+SELECT (SELECT count(*) FROM anthropic.main.users) = (SELECT count(*) FROM anthropic.main.all_users());
+----
+true
+
+query TTIT
+SELECT id, status, accepted_at IS NOT NULL, rbac_group_ids FROM anthropic.main.invites ORDER BY id;
+----
+invite_01	pending	false	[]
+invite_02	accepted	true	[rbac_1]
+invite_03	expired	false	[]
+
+query TIITT
+SELECT id, is_archived, inference_geo_unrestricted, allowed_inference_geos, tags['team'] FROM anthropic.main.workspaces ORDER BY id;
+----
+wrkspc_01	false	true	NULL	prod
+wrkspc_02	false	false	[us]	staging
+wrkspc_03	true	true	NULL	legacy
+
+# The archived workspace (wrkspc_03) is not walked.
+query TT
+SELECT workspace_id, user_id FROM anthropic.main.workspace_members ORDER BY ALL;
+----
+wrkspc_01	user_01
+wrkspc_01	user_02
+wrkspc_01	user_03
+wrkspc_02	user_02
+
+# workspace_id comes from the key's scope; the deprecated top-level field is NULL for apikey_03.
+query TTTT
+SELECT id, workspace_id, created_by_type, principal_type FROM anthropic.main.api_keys ORDER BY id;
+----
+apikey_01	wrkspc_01	user	NULL
+apikey_02	wrkspc_02	service_account	service_account_actor
+apikey_03	wrkspc_default	user	user_actor
+
+query TTI
+SELECT id, limit_type, value FROM anthropic.main.rate_limits WHERE list_contains(models, 'claude-sonnet-5-5') ORDER BY limit_type;
+----
+rl_01	output_tokens_per_minute	400000
+rl_01	requests_per_minute	4000
+
+query TTIIT
+SELECT workspace_id, limit_type, value, org_limit, source FROM anthropic.main.workspace_rate_limits WHERE rate_limit_id = 'rl_01' AND limit_type = 'requests_per_minute' ORDER BY ALL;
+----
+wrkspc_01	requests_per_minute	2000	4000	workspace
+wrkspc_02	requests_per_minute	4000	4000	organization
+
+# A LIMIT ends a paged walk early.
+query I
+SELECT count(*) FROM (SELECT id FROM anthropic.main.users LIMIT 1);
+----
+1

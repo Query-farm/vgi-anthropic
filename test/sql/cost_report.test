@@ -1,0 +1,49 @@
+# name: test/sql/cost_report.test
+# description: cost_report: exact decimals, description grouping, paging
+# group: [anthropic]
+#
+# Runs offline against the fake Admin API (test/mock_api/server.py, fixed clock
+# 2026-09-10 UTC) through ci/run-integration.sh; the key below is the fake's
+# test key, not a credential.
+
+require vgi
+
+require-env VGI_ANTHROPIC_WORKER
+
+require-env VGI_ANTHROPIC_BASE_URL
+
+statement ok
+ATTACH 'anthropic' (TYPE vgi, LOCATION '{VGI_ANTHROPIC_WORKER}');
+
+statement ok
+CREATE SECRET acme (TYPE anthropic_admin, api_key 'sk-ant-admin01-test-key');
+
+query TTT
+SELECT typeof(amount_usd), sum(amount_cents), sum(amount_usd) FROM anthropic.main.cost_report('2026-09-09') WHERE workspace_id = 'wrkspc_01' GROUP BY 1;
+----
+DECIMAL(38,14)	1234.56789	12.3456789
+
+# 0.00001 cents would not survive a float.
+query T
+SELECT amount_cents FROM anthropic.main.cost_report('2026-09-09') WHERE workspace_id IS NULL;
+----
+0.00001
+
+query TT
+SELECT model, sum(amount_usd) FROM anthropic.main.cost_report('2026-09-09') GROUP BY model ORDER BY model;
+----
+claude-opus-5-5	12.3456790
+claude-sonnet-5-5	1
+
+query T
+SELECT COALESCE(w.name, 'Default') AS workspace FROM anthropic.main.cost_report('2026-09-09') c LEFT JOIN anthropic.main.workspaces w ON w.id = c.workspace_id GROUP BY ALL ORDER BY ALL;
+----
+Default
+Prod
+Staging
+
+# 71 days to the fake's clock, paged at 31 days.
+query I
+SELECT count(DISTINCT bucket_start) FROM anthropic.main.cost_report('2026-07-01');
+----
+71

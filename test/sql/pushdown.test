@@ -1,0 +1,87 @@
+# name: test/sql/pushdown.test
+# description: Pushed-down predicates are sent upstream and still applied
+# group: [anthropic]
+#
+# Runs offline against the fake Admin API (test/mock_api/server.py, fixed clock
+# 2026-09-10 UTC) through ci/run-integration.sh; the key below is the fake's
+# test key, not a credential.
+
+require vgi
+
+require-env VGI_ANTHROPIC_WORKER
+
+require-env VGI_ANTHROPIC_BASE_URL
+
+statement ok
+ATTACH 'anthropic' (TYPE vgi, LOCATION '{VGI_ANTHROPIC_WORKER}');
+
+statement ok
+CREATE SECRET acme (TYPE anthropic_admin, api_key 'sk-ant-admin01-test-key');
+
+query T
+SELECT id FROM anthropic.main.users WHERE email = 'person3@acme.test';
+----
+user_03
+
+# The API's email match is case-insensitive; SQL's = still wins.
+query I
+SELECT count(*) FROM anthropic.main.users WHERE email = 'PERSON3@ACME.TEST';
+----
+0
+
+query T
+SELECT user_id FROM anthropic.main.workspace_members WHERE workspace_id = 'wrkspc_02';
+----
+user_02
+
+query T
+SELECT id FROM anthropic.main.api_keys WHERE status = 'archived';
+----
+apikey_03
+
+# A service-account creator must not be pushed as created_by_user_id.
+query T
+SELECT id FROM anthropic.main.api_keys WHERE created_by_id = 'svac_01';
+----
+apikey_02
+
+query T
+SELECT id FROM anthropic.main.api_keys WHERE created_by_id = 'user_02';
+----
+apikey_03
+
+query T
+SELECT id FROM anthropic.main.api_keys WHERE workspace_id = 'wrkspc_default';
+----
+apikey_03
+
+# Impossible predicates return nothing (filter pushdown drops the engine's own filter).
+query I
+SELECT count(*) FROM anthropic.main.users WHERE role = 'no-such-role';
+----
+0
+
+query I
+SELECT count(*) FROM anthropic.main.workspaces WHERE name = 'Nope';
+----
+0
+
+query I
+SELECT count(*) FROM anthropic.main.api_keys WHERE status = 'active' AND name = 'nope';
+----
+0
+
+query I
+SELECT count(*) FROM anthropic.main.messages_usage('2026-09-01') WHERE output_tokens > 1e12;
+----
+0
+
+query I
+SELECT count(*) FROM anthropic.main.cost_report('2026-09-01') WHERE amount_usd > 1e9;
+----
+0
+
+query I
+SELECT count(*) FROM anthropic.main.claude_code_usage('2026-09-01') WHERE num_sessions > 1000;
+----
+0

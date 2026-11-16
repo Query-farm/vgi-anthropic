@@ -1,0 +1,105 @@
+# name: test/sql/messages_usage.test
+# description: messages_usage: argument casting, grouping, buckets, argument errors
+# group: [anthropic]
+#
+# Runs offline against the fake Admin API (test/mock_api/server.py, fixed clock
+# 2026-09-10 UTC) through ci/run-integration.sh; the key below is the fake's
+# test key, not a credential.
+
+require vgi
+
+require-env VGI_ANTHROPIC_WORKER
+
+require-env VGI_ANTHROPIC_BASE_URL
+
+statement ok
+ATTACH 'anthropic' (TYPE vgi, LOCATION '{VGI_ANTHROPIC_WORKER}');
+
+statement ok
+CREATE SECRET acme (TYPE anthropic_admin, api_key 'sk-ant-admin01-test-key');
+
+query I
+SELECT count(*) > 0 FROM anthropic.main.messages_usage('2026-09-08');
+----
+true
+
+# Every time type binds to the same one-day report (157 output tokens per day).
+query I
+SELECT sum(output_tokens) FROM anthropic.main.messages_usage('2026-09-08', ending_at => '2026-09-09');
+----
+157
+
+query I
+SELECT sum(output_tokens) FROM anthropic.main.messages_usage(DATE '2026-09-08', ending_at => '2026-09-09');
+----
+157
+
+query I
+SELECT sum(output_tokens) FROM anthropic.main.messages_usage(TIMESTAMP '2026-09-08', ending_at => '2026-09-09');
+----
+157
+
+query I
+SELECT sum(output_tokens) FROM anthropic.main.messages_usage(TIMESTAMPTZ '2026-09-08 00:00:00+00', ending_at => '2026-09-09');
+----
+157
+
+query TI
+SELECT model, sum(output_tokens) FROM anthropic.main.messages_usage('2026-09-08', ending_at => '2026-09-09') GROUP BY model ORDER BY model;
+----
+claude-opus-5-5	120
+claude-sonnet-5-5	37
+
+# Totals do not depend on which dimensions are selected (4 days x 157).
+query I
+SELECT sum(output_tokens) FROM anthropic.main.messages_usage('2026-09-01', ending_at => '2026-09-05');
+----
+628
+
+query I
+SELECT sum(output_tokens) FROM (SELECT model, workspace_id, api_key_id, output_tokens FROM anthropic.main.messages_usage('2026-09-01', ending_at => '2026-09-05'));
+----
+628
+
+# An equality filter is pushed and grouped by.
+query I
+SELECT sum(output_tokens) FROM anthropic.main.messages_usage('2026-09-08', ending_at => '2026-09-09') WHERE model = 'claude-sonnet-5-5';
+----
+37
+
+query TT
+SELECT DISTINCT model, workspace_id FROM anthropic.main.messages_usage('2026-09-08', ending_at => '2026-09-09', group_by => ['model']) ORDER BY model;
+----
+claude-opus-5-5	NULL
+claude-sonnet-5-5	NULL
+
+# 8 days of hourly buckets, more than one page.
+query I
+SELECT count(DISTINCT bucket_start) FROM anthropic.main.messages_usage('2026-09-01', ending_at => '2026-09-09', bucket_width => '1h');
+----
+192
+
+query TT
+SELECT DISTINCT bucket_start, bucket_end::TIMESTAMP - bucket_start::TIMESTAMP FROM anthropic.main.messages_usage('2026-09-08', ending_at => '2026-09-09');
+----
+2026-09-08 00:00:00+00	1 day
+
+statement error
+SELECT * FROM anthropic.main.messages_usage('not a date');
+----
+<REGEX>:.*not a date or timestamp.*
+
+statement error
+SELECT * FROM anthropic.main.messages_usage('2026-09-08', ending_at => '2026-09-01');
+----
+<REGEX>:.*must be after.*
+
+statement error
+SELECT * FROM anthropic.main.messages_usage('2026-09-08', group_by => ['modle']);
+----
+<REGEX>:.*modle.*
+
+statement error
+SELECT * FROM anthropic.main.messages_usage('2026-09-08', bucket_width => '1w');
+----
+<REGEX>:.*1w.*

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# The single worker executable ci/run-integration.sh drives: no arguments =
+# stdio, `--http --port 0` = HTTP (prints PORT:<n>), and the SDK's own launch
+# (unix socket) mode. Runs anthropic_worker.py from the project venv through
+# tests/run_worker.py, which hides the dev group's `haybarn` module so the
+# worker evaluates pushed-down filters with DuckDB 1.5, as a deployed worker does.
+set -euo pipefail
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+exec "$REPO/.venv/bin/python" "$REPO/tests/run_worker.py" "$REPO/anthropic_worker.py" "$@"

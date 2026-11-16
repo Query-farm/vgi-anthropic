@@ -1,0 +1,56 @@
+# name: test/sql/claude_code_usage.test
+# description: claude_code_usage: per-day walk, roll-ups, nested columns, argument errors
+# group: [anthropic]
+#
+# Runs offline against the fake Admin API (test/mock_api/server.py, fixed clock
+# 2026-09-10 UTC) through ci/run-integration.sh; the key below is the fake's
+# test key, not a credential.
+
+require vgi
+
+require-env VGI_ANTHROPIC_WORKER
+
+require-env VGI_ANTHROPIC_BASE_URL
+
+statement ok
+ATTACH 'anthropic' (TYPE vgi, LOCATION '{VGI_ANTHROPIC_WORKER}');
+
+statement ok
+CREATE SECRET acme (TYPE anthropic_admin, api_key 'sk-ant-admin01-test-key');
+
+query T
+SELECT DISTINCT date FROM anthropic.main.claude_code_usage('2026-09-01');
+----
+2026-09-01
+
+# 3 days x 3 records, paged at 2 per page within each day.
+query I
+SELECT count(*) FROM anthropic.main.claude_code_usage(DATE '2026-09-01', ending_date => DATE '2026-09-03');
+----
+9
+
+query IITTI
+SELECT input_tokens, output_tokens, estimated_cost_cents, estimated_cost_usd, len(model_breakdown) FROM anthropic.main.claude_code_usage('2026-09-01') WHERE email_address = 'person1@acme.test';
+----
+1500	250	228.5	2.285	2
+
+query IT
+SELECT tool_actions['edit_tool'].accepted, m.model FROM anthropic.main.claude_code_usage('2026-09-01'), UNNEST(model_breakdown) AS t(m) WHERE actor_type = 'api_actor' ORDER BY m.model;
+----
+9	claude-opus-5-5
+9	claude-sonnet-5-5
+
+query I
+SELECT count(*) FROM (SELECT * FROM anthropic.main.claude_code_usage('2026-08-01', ending_date => '2026-08-31') LIMIT 1);
+----
+1
+
+statement error
+SELECT * FROM anthropic.main.claude_code_usage('2026-09-05', ending_date => '2026-09-01');
+----
+<REGEX>:.*before starting_date.*
+
+statement error
+SELECT * FROM anthropic.main.claude_code_usage('2020-01-01', ending_date => '2026-01-01');
+----
+<REGEX>:.*more than 366.*

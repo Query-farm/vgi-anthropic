@@ -1,0 +1,52 @@
+# name: test/sql/catalog.test
+# description: The catalog's tables and functions are advertised
+# group: [anthropic]
+#
+# Runs offline against the fake Admin API (test/mock_api/server.py, fixed clock
+# 2026-09-10 UTC) through ci/run-integration.sh; the key below is the fake's
+# test key, not a credential.
+
+require vgi
+
+require-env VGI_ANTHROPIC_WORKER
+
+require-env VGI_ANTHROPIC_BASE_URL
+
+statement ok
+ATTACH 'anthropic' (TYPE vgi, LOCATION '{VGI_ANTHROPIC_WORKER}');
+
+query T
+SELECT table_name FROM duckdb_tables() WHERE database_name = 'anthropic' ORDER BY table_name;
+----
+api_keys
+invites
+organization
+rate_limits
+users
+workspace_members
+workspace_rate_limits
+workspaces
+
+query T
+SELECT DISTINCT function_name FROM duckdb_functions() WHERE database_name = 'anthropic' ORDER BY function_name;
+----
+all_api_keys
+all_invites
+all_organization
+all_rate_limits
+all_users
+all_workspace_members
+all_workspace_rate_limits
+all_workspaces
+api_key_by_id
+claude_code_usage
+cost_report
+messages_usage
+user_by_id
+workspace_by_id
+
+# Querying without an anthropic_admin secret names the fix.
+statement error
+SELECT * FROM anthropic.main.organization;
+----
+<REGEX>:.*CREATE SECRET.*
