@@ -75,7 +75,7 @@ Pin a tag for a deployment, so the worker cannot change under you:
 
 ```sql
 ATTACH 'anthropic' (TYPE vgi,
-  LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-anthropic@v0.1.2 vgi-anthropic');
+  LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-anthropic@v0.1.3 vgi-anthropic');
 ```
 
 To run it as a server and attach to a URL instead, use the `vgi-anthropic-http`
