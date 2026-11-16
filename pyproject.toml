@@ -13,12 +13,12 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Database",
     "Topic :: System :: Monitoring",
     "Typing :: Typed",
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     # The engine extra is not optional: vgi-python binds a pushed-down WHERE
     # clause with an in-process DuckDB engine (its pinned DuckDB 1.5 filter
@@ -71,7 +71,7 @@ path = "vgi_anthropic/__init__.py"
 
 [tool.ruff]
 line-length = 110
-target-version = "py313"
+target-version = "py314"
 
 # Selected explicitly rather than left to the default set, which changes between
 # ruff releases, so CI and a developer's shell agree about the same commit.

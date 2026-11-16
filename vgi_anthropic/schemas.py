@@ -60,7 +60,7 @@ def to_decimal(value: Any) -> Decimal | None:
         return None
     try:
         parsed = Decimal(str(value))
-    except (InvalidOperation, ValueError):
+    except InvalidOperation, ValueError:
         return None
     return parsed if parsed.is_finite() else None
 
@@ -91,7 +91,7 @@ def to_timestamp(value: Any) -> datetime | None:
     else:
         try:
             parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        except (ValueError, OverflowError):
+        except ValueError, OverflowError:
             return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
@@ -130,7 +130,7 @@ def to_integer(value: Any) -> int | None:
         return int(value) if value.is_integer() else None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         parsed = to_decimal(value)
         if parsed is not None and parsed == parsed.to_integral_value():
             return int(parsed)
@@ -164,7 +164,7 @@ def column(rows: Sequence[dict[str, Any]], key: str, f: pa.Field) -> pa.Array:
     coerced = [_coerce_nested(v, kind) for v in values]
     try:
         return pa.array(coerced, type=kind)
-    except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError):
+    except pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError:
         return pa.array([_nullable_nested(v, kind) for v in coerced], type=kind)
 
 
@@ -206,7 +206,7 @@ def _nullable_nested(value: Any, kind: pa.DataType) -> Any:
         return None
     try:
         pa.array([value], type=kind)
-    except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError):
+    except pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError:
         return None
     return value
 
