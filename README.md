@@ -49,6 +49,8 @@ JOIN anthropic.users u ON u.email = c.email_address
 GROUP BY u.role ORDER BY sessions DESC;
 ```
 
+vgi-anthropic 0.2.0 speaks VGI protocol 3.4, so it needs Haybarn 2.0.1 or newer (Haybarn 2.0.0 loads a 3.3 `vgi` extension that cannot attach it).
+
 ## Run
 
 ```bash
@@ -75,7 +77,7 @@ Pin a tag for a deployment, so the worker cannot change under you:
 
 ```sql
 ATTACH 'anthropic' (TYPE vgi,
-  LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-anthropic@v0.1.3 vgi-anthropic');
+  LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-anthropic@v0.2.0 vgi-anthropic');
 ```
 
 To run it as a server and attach to a URL instead, use the `vgi-anthropic-http`

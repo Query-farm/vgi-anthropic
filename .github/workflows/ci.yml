@@ -12,7 +12,7 @@ concurrency:
 
 env:
   # The SQL test runner; must speak the same VGI protocol as the SDK.
-  HAYBARN_VERSION: "2.0.0rc11"
+  HAYBARN_VERSION: "2.0.1rc3"
   # pyproject carries no `[tool.uv.sources]`, so a fresh clone resolves from
   # PyPI. This pins that shut: if a local path source is ever added, CI still
   # proves the *published* dependencies are sufficient.
@@ -89,7 +89,7 @@ jobs:
       # against a real organization and needs an Admin key — see live.yml.
       - name: vgi-lint (structural)
         run: >
-          uvx --no-sources --from vgi-lint-check==2.5.1 vgi-lint lint "uv run --no-sources anthropic_worker.py"
+          uvx --no-sources --from vgi-lint-check==2.9.0 vgi-lint lint "uv run --no-sources anthropic_worker.py"
           --no-execute --no-check-links --audit-waivers --fail-on warning
       # Every shipped example executed, and every expected_result compared,
       # against the local fake Admin API — no key, no network.

@@ -25,12 +25,12 @@ dependencies = [
     # evaluator), and without one every filtered scan fails at runtime with "No
     # DuckDB-compatible engine is installed". The SQL tests use Haybarn 2.0
     # separately (dev group) as the VGI protocol 3.3 client.
-    "vgi-python[http,duckdb]>=0.52.2,<0.53",
+    "vgi-python[http,duckdb]>=0.55.1,<0.56",
     "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
-serve = ["vgi-python[http,duckdb,oauth]>=0.52.2,<0.53", "vgi-rpc[sentry]>=0.53.1"]
+serve = ["vgi-python[http,duckdb,oauth]>=0.55.1,<0.56", "vgi-rpc[sentry]>=0.53.1"]
 
 [dependency-groups]
 dev = [
@@ -42,7 +42,7 @@ dev = [
     # the Admin API — the only way to exercise argument casting, projection and
     # filter pushdown the way the DuckDB extension actually performs them.
     # Haybarn 2.0 is the client whose vgi extension speaks protocol 3.3.
-    "haybarn>=2.0.0rc11,<2.1",
+    "haybarn>=2.0.1rc3,<2.1",
     # DuckDB materializes TIMESTAMP WITH TIME ZONE through pytz; without it a
     # scan that returns one fails at fetch time, not at bind.
     "pytz>=2024.1",
